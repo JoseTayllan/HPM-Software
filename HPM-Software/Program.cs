@@ -10,55 +10,93 @@ namespace HPM_Software
     internal static class Program
     {
         private const string PlanilhaNome = "Dados Extraídos PDF";
-        private const string PlanilhaIdFilePath = "planilha_id.txt";
-        private const string PDFFolderPath = @"C:\Users\Neymar Jr\OneDrive\Documentos\PDFs";
+        public const string PlanilhaIdFilePath = "planilha_id.txt";
+        private static string PDFFolderPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "PDFs");
 
         public static string GoogleClientId { get; set; }
         public static string GoogleSecret { get; set; }
 
-        /// <summary>
-        /// The main entry point for the application.
-        /// </summary>
         [STAThread]
         private static async Task Main(string[] args)
         {
-            LoadConfig();
-
             ApplicationConfiguration.Initialize();
+
+            Console.WriteLine("Verificando configuração...");
+
+            if (!LoadConfig())
+            {
+                Console.WriteLine("Arquivo de configuração não encontrado. Exibindo formulário de configuração.");
+                ConfigForm configForm = new ConfigForm();
+                if (configForm.ShowDialog() == DialogResult.OK)
+                {
+                    GoogleClientId = configForm.GoogleClientId;
+                    GoogleSecret = configForm.GoogleSecret;
+                    SaveConfig();
+                }
+                else
+                {
+                    MessageBox.Show("Configuration is required to run the application.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+            }
+
+            Console.WriteLine("Iniciando a aplicação principal...");
             Application.Run(new Form1());
 
             try
             {
-                // Inicialização e autenticação
-                UserCredential credential = GoogleAuthentication.Login(GoogleClientId, GoogleSecret, new[] { Google.Apis.Sheets.v4.SheetsService.Scope.Spreadsheets });
+                Console.WriteLine("Autenticando com o Google...");
+                UserCredential credential = await GoogleAuthentication.LoginAsync(GoogleClientId, GoogleSecret, new[] { Google.Apis.Sheets.v4.SheetsService.Scope.Spreadsheets });
                 GoogleSheatsManager manager = new GoogleSheatsManager(credential);
 
-                // Carregar ou criar uma nova planilha
                 string spreadsheetId = LoadOrCreateSpreadsheet(manager);
-
-                // Obter o nome da primeira aba da planilha
                 string sheetName = manager.GetSheetName(spreadsheetId);
 
-                // Monitorar a pasta de PDFs continuamente
+                Console.WriteLine("Monitorando a pasta de PDFs...");
                 await MonitorarPastaDePDFsAsync(manager, spreadsheetId, sheetName);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Erro: {ex.Message}");
+                MessageBox.Show($"Erro: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        private static void LoadConfig()
+        private static bool LoadConfig()
         {
             try
             {
-                var config = JsonConvert.DeserializeObject<Config>(File.ReadAllText("config.json"));
-                GoogleClientId = config.GoogleClientId;
-                GoogleSecret = config.GoogleSecret;
+                if (File.Exists("config.json"))
+                {
+                    var config = JsonConvert.DeserializeObject<Config>(File.ReadAllText("config.json"));
+                    GoogleClientId = config.GoogleClientId;
+                    GoogleSecret = config.GoogleSecret;
+                    return true;
+                }
+                Console.WriteLine("Arquivo de configuração não encontrado.");
+                return false;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Erro ao carregar configuração: {ex.Message}");
+                MessageBox.Show($"Erro ao carregar configuração: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
+        }
+
+        private static void SaveConfig()
+        {
+            try
+            {
+                var config = new Config
+                {
+                    GoogleClientId = GoogleClientId,
+                    GoogleSecret = GoogleSecret
+                };
+                File.WriteAllText("config.json", JsonConvert.SerializeObject(config));
+                Console.WriteLine("Configuração salva com sucesso.");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Erro ao salvar configuração: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -68,7 +106,6 @@ namespace HPM_Software
 
             if (string.IsNullOrEmpty(spreadsheetId) || !manager.CheckSpreadsheetExists(spreadsheetId))
             {
-                // Cria uma nova planilha se o ID não estiver armazenado ou se a planilha não existir mais
                 var newSheet = manager.CreateNew(PlanilhaNome);
                 spreadsheetId = newSheet.SpreadsheetId;
                 SaveSpreadsheetId(spreadsheetId);
@@ -77,7 +114,7 @@ namespace HPM_Software
             return spreadsheetId;
         }
 
-        private static string LoadSpreadsheetId()
+        public static string LoadSpreadsheetId()
         {
             if (File.Exists(PlanilhaIdFilePath))
             {
@@ -86,7 +123,7 @@ namespace HPM_Software
             return null;
         }
 
-        private static void SaveSpreadsheetId(string spreadsheetId)
+        public static void SaveSpreadsheetId(string spreadsheetId)
         {
             File.WriteAllText(PlanilhaIdFilePath, spreadsheetId);
         }
@@ -101,12 +138,17 @@ namespace HPM_Software
                 {
                     try
                     {
-                        // Instanciar Funcoes e processar o PDF
                         Funcoes funcoes = new Funcoes(manager, spreadsheetId, sheetName);
                         await funcoes.LerEEnviarDadosDoPDFAsync(pdfPath);
 
-                        // Mover ou excluir o PDF após o processamento, se necessário
-                        // Exemplo: File.Move(pdfPath, Path.Combine(doneFolder, Path.GetFileName(pdfPath)));
+                        string doneFolder = Path.Combine(PDFFolderPath, "Processados");
+                        if (!Directory.Exists(doneFolder))
+                        {
+                            Directory.CreateDirectory(doneFolder);
+                        }
+
+                        string destinationPath = Path.Combine(doneFolder, Path.GetFileName(pdfPath));
+                        File.Move(pdfPath, destinationPath);
                     }
                     catch (Exception ex)
                     {
@@ -114,7 +156,7 @@ namespace HPM_Software
                     }
                 }
 
-                await Task.Delay(5000); // Aguarda 5 segundos antes de verificar novamente a pasta
+                await Task.Delay(5000);
             }
         }
 

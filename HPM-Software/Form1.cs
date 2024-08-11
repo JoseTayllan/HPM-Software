@@ -5,7 +5,12 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-
+/*
+Nome do Programa
+Objetivo do programa
+Nome do Programador
+Data de Criação
+*/
 namespace HPM_Software
 {
     public partial class Form1 : Form
@@ -14,6 +19,7 @@ namespace HPM_Software
         private CancellationTokenSource cancellationTokenSource;
         private readonly string pdfFolderPath;
         private GoogleSheatsManager manager;
+        private string currentSpreadsheetId;
 
         public Form1()
         {
@@ -26,12 +32,14 @@ namespace HPM_Software
             manager = new GoogleSheatsManager(credential);
             funcoes = new Funcoes(manager, string.Empty, "Sheet1");
             cancellationTokenSource = new CancellationTokenSource();
+            currentSpreadsheetId = Program.LoadSpreadsheetId();
         }
 
         private void Form1_Load(object sender, EventArgs e)
         {
             textBoxGoogleClientId.Text = Program.GoogleClientId;
             textBoxGoogleSecret.Text = Program.GoogleSecret;
+            textBoxCurrentSpreadsheetId.Text = currentSpreadsheetId;
         }
 
         private async void btnExtrair_Click(object sender, EventArgs e)
@@ -123,5 +131,105 @@ namespace HPM_Software
         {
 
         }
+
+        private void label1_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private async void btnCriarNovaAba_Click(object sender, EventArgs e)
+        {
+            string novaAbaNome = textBoxNomeAba.Text.Trim();
+            if (string.IsNullOrEmpty(novaAbaNome))
+            {
+                MessageBox.Show("Por favor, insira um nome para a nova aba.");
+                return;
+            }
+
+            try
+            {
+                string spreadsheetId = LoadSpreadsheetId(); // Certifique-se de ter o ID da planilha
+
+                if (string.IsNullOrEmpty(spreadsheetId) || !manager.CheckSpreadsheetExists(spreadsheetId))
+                {
+                    MessageBox.Show("ID da planilha não encontrado ou a planilha não existe.");
+                    return;
+                }
+
+                await manager.CriarAbaAsync(spreadsheetId, novaAbaNome);
+                MessageBox.Show("Nova aba criada com sucesso!");
+
+                // Atualiza a instância de Funcoes para usar a nova aba
+                funcoes = new Funcoes(manager, spreadsheetId, novaAbaNome);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Erro ao criar nova aba: {ex.Message}");
+            }
+        }
+        private string LoadSpreadsheetId()
+        {
+            if (File.Exists(Program.PlanilhaIdFilePath))
+            {
+                return File.ReadAllText(Program.PlanilhaIdFilePath).Trim();
+            }
+            return null;
+        }
+
+        private void btnChangeSpreadsheet_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                string newSpreadsheetId = textBoxCurrentSpreadsheetId.Text;
+                if (string.IsNullOrEmpty(newSpreadsheetId))
+                {
+                    MessageBox.Show("Por favor, insira o ID da nova planilha.");
+                    return;
+                }
+
+                if (!manager.CheckSpreadsheetExists(newSpreadsheetId))
+                {
+                    MessageBox.Show("A planilha com o ID especificado não existe.");
+                    return;
+                }
+
+                Program.SaveSpreadsheetId(newSpreadsheetId);  // Atualize para usar Program.SaveSpreadsheetId
+                currentSpreadsheetId = newSpreadsheetId;
+
+                MessageBox.Show("Planilha trocada com sucesso.");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Erro ao trocar de planilha: {ex.Message}");
+            }
+        }
+
+        private void btnCreateNewSpreadsheet_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                string newSpreadsheetName = textBoxNewSpreadsheetName.Text;
+                if (string.IsNullOrEmpty(newSpreadsheetName))
+                {
+                    MessageBox.Show("Por favor, insira o nome da nova planilha.");
+                    return;
+                }
+
+                var newSpreadsheet = manager.CreateNew(newSpreadsheetName);
+                string newSpreadsheetId = newSpreadsheet.SpreadsheetId;
+
+                Program.SaveSpreadsheetId(newSpreadsheetId);
+                textBoxCurrentSpreadsheetId.Text = newSpreadsheetId;
+
+                funcoes = new Funcoes(manager, newSpreadsheetId, "Dados");
+
+                MessageBox.Show($"Nova planilha '{newSpreadsheetName}' criada com sucesso.");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Erro ao criar nova planilha: {ex.Message}");
+            }
+        }
     }
+
 }

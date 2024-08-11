@@ -52,6 +52,7 @@ namespace HPM_Software
             return spreadsheet;
         }
 
+
         public async Task AddDataAsync(string spreadsheetId, string sheetName, IList<IList<object>> values)
         {
             var range = $"{sheetName}!A1";
@@ -98,6 +99,33 @@ namespace HPM_Software
             {
                 Console.WriteLine($"Erro ao obter o nome da planilha: {ex.Message}");
                 return null;
+            }
+        }
+        public async Task CriarAbaAsync(string spreadsheetId, string novaAbaNome)
+        {
+            var addSheetRequest = new AddSheetRequest
+            {
+                Properties = new SheetProperties
+                {
+                    Title = novaAbaNome
+                }
+            };
+
+            var request = new Request { AddSheet = addSheetRequest };
+            var batchUpdateSpreadsheetRequest = new BatchUpdateSpreadsheetRequest
+            {
+                Requests = new List<Request> { request }
+            };
+
+            try
+            {
+                var batchUpdateRequest = _sheetsService.Spreadsheets.BatchUpdate(batchUpdateSpreadsheetRequest, spreadsheetId);
+                await batchUpdateRequest.ExecuteAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erro ao criar nova aba: {ex.Message}");
+                throw new Exception($"Erro ao criar nova aba: {ex.Message}", ex); // Re-lança a exceção com uma mensagem personalizada
             }
         }
     }

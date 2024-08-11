@@ -16,6 +16,7 @@ namespace HPM_Software
         private readonly string _spreadsheetId;
         private readonly string _sheetName;
         private readonly Dictionary<string, List<string>> pdfTexts;
+        public string SpreadsheetId => _spreadsheetId;
 
         public Funcoes(GoogleSheatsManager googleSheetsManager, string spreadsheetId, string sheetName)
         {
@@ -50,6 +51,7 @@ namespace HPM_Software
                 }
 
                 await ExtrairDadosClientesAsync();
+                MoverPDFProcessado(pdfPath); // Mover o PDF após o processamento
             }
             catch (Exception ex)
             {
@@ -90,7 +92,7 @@ namespace HPM_Software
                     }
                     else
                     {
-                        //Tenta encontrar "Cliente:" seguido de "Telefone:"
+                        // Tenta encontrar "Cliente:" seguido de "Telefone:"
                         Match clienteMatch = clientePattern.Match(text);
                         if (clienteMatch.Success)
                         {
@@ -132,12 +134,12 @@ namespace HPM_Software
                     {
                         values.Add(new List<object>
                         {
-                            nomeCliente,
-                            dataEmissao,
-                            horarioEmissao,
-                            nomeProfissional,
-                            numeroGuia,
-                            valorTotal
+                             dataEmissao, 
+                             nomeCliente, 
+                             horarioEmissao, 
+                             nomeProfissional, 
+                             numeroGuia, 
+                             valorTotal 
                         });
                     }
                 }
@@ -153,6 +155,25 @@ namespace HPM_Software
             {
                 Console.WriteLine($"Erro ao enviar dados para o Google Sheets: {ex.Message}");
                 throw; // Re-lança a exceção para que a camada superior trate adequadamente
+            }
+        }
+
+        private void MoverPDFProcessado(string pdfPath)
+        {
+            try
+            {
+                string doneFolder = Path.Combine(pdfFolderPath, "Processados");
+                Directory.CreateDirectory(doneFolder);
+
+                string fileName = Path.GetFileName(pdfPath);
+                string destinationPath = Path.Combine(doneFolder, fileName);
+
+                File.Move(pdfPath, destinationPath);
+                Console.WriteLine($"PDF '{fileName}' movido para a pasta de PDFs processados.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erro ao mover o PDF '{pdfPath}' para a pasta de PDFs processados: {ex.Message}");
             }
         }
 
