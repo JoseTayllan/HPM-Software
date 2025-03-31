@@ -1,5 +1,6 @@
 HPM Software - Preenchimento de Planilha do Google Sheets a partir de PDFs de Guias Hospitalares
 🏥 Descrição
+
 O HPM Software é uma aplicação desenvolvida em C# com Windows Forms que automatiza o preenchimento de uma planilha do Google Sheets com dados extraídos de arquivos PDF de guias hospitalares. Esse processo otimiza a organização das informações hospitalares, reduzindo o trabalho manual e possíveis erros.
 
 ✨ Funcionalidades
